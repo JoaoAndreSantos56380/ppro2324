@@ -1,7 +1,7 @@
 {- module P1_fc56380 where -}
 
 baralho :: [String]
-baralho = [valor ++ naipe | valor <- ["A", "2", "3", "4", "5", "6", "7", "8", "9", "T", "J", "Q", "K"], naipe <- ["S", "H", "D", "C"]]
+baralho = [valor ++ naipe | valor <- ["2", "3", "4", "5", "6", "7", "8", "9", "A", "T", "J", "Q", "K"], naipe <- ["S", "H", "D", "C"]]
 
 half :: [a] -> ([a],[a])
 half xs
@@ -30,7 +30,7 @@ cardValue xs
 
 
 combinacoesBlackjack :: Int -> [(String, String)]
-combinacoesBlackjack points = removeDuplicatesTuple [ (card1, card2) | card1 <- baralho, card2 <- baralho, value1 <- (cardValue card1), value2 <- (cardValue card2), (value1 + value2) == points ]
+combinacoesBlackjack points = removeDuplicatesTuple [ (card1, card2) | card1 <- baralho, card2 <- baralho, value1 <- (cardValue card1), value2 <- (cardValue card2), (value1 + value2) == points, card1 /= card2 ]
 
 removeDuplicatesTuple :: (Ord a) => [(a, a)] -> [(a, a)]
 removeDuplicatesTuple xs = [(a, b) | i <- [0..length sortedPairs - 1],
@@ -38,32 +38,57 @@ removeDuplicatesTuple xs = [(a, b) | i <- [0..length sortedPairs - 1],
                                not (elem (a, b) (take i sortedPairs))]
     where sortedPairs = [(min a b, max a b) | (a, b) <- xs]
 
-removeDuplicatesString :: (Ord a) => [[a]] -> [[a]]
+fullHouses = removeFirstThreeDuplicates ([ (card1, card2, card3, card4, card5) | card1 <- baralho, card2 <- baralho, card3 <- baralho, card4 <- baralho, card5 <- baralho, head card1 == head card2 && head card1 == head card3 && head card1 /= head card4 && head card4 == head card5 && tail card1 /= tail card2 && tail card1 /= tail card3 && tail card2 /= tail card3 && tail card4 /= tail card5 ])
+
+
+-- A função removeFirstThreeDuplicates está a funcionar bem. Só falta agrupar o (take i sortedTriple) pela quarta (ou quinta) carta, e aplicar o removeFirstThreeDuplicates a cada um desses grupos. Neste momento, estamos a aplicar o removeFirstThreeDuplicates aos grupos todos, resultando nisto: [("2D","2H","2S","3S","3H"),("2C","2H","2S","3S","3H"),("2C","2D","2S","3S","3H"),("2C","2D","2H","3S","3H"), ...] mas depois não temos os grupos de 4, 5, 6, 7, 8, 9, K, D, J e Q.
+removeFirstThreeDuplicates xs = [(a, b, c, d, e) | i <- [0..length sortedTriple - 1],
+                               let (a, b, c, d, e) = sortedTriple !! i,
+                               not ([a, b, c] `elem` (removeFirstThreeDuplicatesAux (take i sortedTriple)))]
+    where sortedTriple = [(minimum [a, b, c], minimum [x | x <- [a, b, c], x /= minimum [a, b, c]], maximum [a, b, c], d, e) | (a, b, c, d, e) <- xs]
+
+removeFirstThreeDuplicatesAux xs = [[a, b, c] | (a, b, c, d, e) <- xs]
+
+removeFirstThreeDuplicatesAux2 x xs =
+
+removeLastTwoDuplicates xs = [(a, b, c, d, e) | i <- [0..length sortedTuple - 1],
+                               let (a, b, c, d, e) = sortedTuple !! i,
+                               not ([d, e] `elem` (removeLastTwoDuplicatesAux (take i sortedTuple)))]
+    where sortedTuple = [(a, b, c, min d e, max d e) | (a, b, c, d, e) <- xs]
+
+removeLastTwoDuplicatesAux xs = [[d, e] | (a, b, c, d, e) <- xs]
+
+{- removeDuplicatesTuples xs = [(a, b, c, d, e) | i <- [0..length sortedPairs - 1],
+                               let (a, b, c, d, e) = sortedPairs !! i,
+                               not (elem (a, b, c, d, e) (take i sortedPairs))]
+    where sortedPairs = [(minimum [a, b, c, d, e], minimum [x | x <- [a, b, c, d, e], x /= minimum [a, b, c, d, e]], minimum [x | x <- [a, b, c, d, e], x /= minimum [a, b, c, d, e] && x /= minimum [x | x <- [a, b, c, d, e], x /= minimum [a, b, c, d, e]]], maximum [x | x <- [a, b, c, d, e], x /= maximum [a, b, c, d, e]], maximum [a, b, c, d, e]) | (a, b, c, d, e) <- xs] -}
+
+{- sort l = [y | x <- [minBound..], y <- l, y == x] -}
+
+main = do
+  let full = fullHouses
+  print full
+  print (length full)
+
+{- removeDuplicatesString :: (Ord a) => [[a]] -> [[a]]
 removeDuplicatesString xs = [a | i <- [0..length sortedPairs - 1],
                                let a = sortedPairs !! i,
                                not (elem a (take i sortedPairs))]
-    where sortedPairs = [a | a <- xs]
+    where sortedPairs = [a | a <- xs] -}
 
 
 
-fullHouses:: (Ord a) => [[a]]
-fullHouses = removeDuplicatesString [[elem1, elem2, elem3, elem4, elem5]| elem1 <- baralho, elem2 <- baralho, elem3 <- baralho, elem4 <- baralho, elem5 <- baralho, fst (half elem1) == fst (half elem2), fst (half elem2) == fst (half elem3), fst (half elem4) == fst (half elem5), fst (half elem1) /= fst (half elem4)]
 
 
-valueHandAux [card1, card2] = [ card1Value+card2Value | [card1Value, card2Value] <- [ [card1Values, card2Values] | card1Values <- cardValue(card1), card2Values <- cardValue(card2)]]
 
-valueHand [card1, card2] = [value | value <- valueHandAux [card1, card2], not (value `elem` valueHandAux [card1, card2])]
+{- valueHandAux [card1, card2] = [ card1Value+card2Value | [card1Value, card2Value] <- [ [card1Values, card2Values] | card1Values <- cardValue(card1), card2Values <- cardValue(card2)]]
+
+valueHand [card1, card2] = [value | value <- valueHandAux [card1, card2], not (value `elem` valueHandAux [card1, card2])] -}
 
 --combinacoesBlackjackAux :: Int -> [(String, String)]
 --combinacoesBlackjackAux points = [ (card1, card2) | card1 <- baralho, card2 <- baralho, (cardValue card1) + (cardValue card2) == [points], card1 /= card2]
 
-main = do
-  print (baralho)
-  print ([(card, cardValue card) | card <- baralho])
-  let hand = ["AS", "AH"]
-  print (valueHandAux hand)
-  print (valueHand hand)
-  --print (valueHand ["AS", "AH"])
+
 
 {-
 combinacoesBlackjack :: Int -> [(String, String)]
