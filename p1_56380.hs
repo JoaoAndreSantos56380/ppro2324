@@ -1,6 +1,6 @@
 {- module P1_fc56380 where -}
 
-baralho:: [String]
+baralho :: [String]
 baralho = [valor ++ naipe | valor <- ["A", "2", "3", "4", "5", "6", "7", "8", "9", "T", "J", "Q", "K"], naipe <- ["S", "H", "D", "C"]]
 
 half :: [a] -> ([a],[a])
@@ -27,6 +27,28 @@ cardValue xs
     | halfe == "Q" = [10]
     | halfe == "K" = [10]
     where halfe = fst (half xs)
+
+
+combinacoesBlackjack :: Int -> [(String, String)]
+combinacoesBlackjack points = removeDuplicatesTuple [ (card1, card2) | card1 <- baralho, card2 <- baralho, value1 <- (cardValue card1), value2 <- (cardValue card2), (value1 + value2) == points ]
+
+removeDuplicatesTuple :: (Ord a) => [(a, a)] -> [(a, a)]
+removeDuplicatesTuple xs = [(a, b) | i <- [0..length sortedPairs - 1],
+                               let (a, b) = sortedPairs !! i,
+                               not (elem (a, b) (take i sortedPairs))]
+    where sortedPairs = [(min a b, max a b) | (a, b) <- xs]
+
+removeDuplicatesString :: (Ord a) => [[a]] -> [[a]]
+removeDuplicatesString xs = [a | i <- [0..length sortedPairs - 1],
+                               let a = sortedPairs !! i,
+                               not (elem a (take i sortedPairs))]
+    where sortedPairs = [a | a <- xs]
+
+
+
+fullHouses:: (Ord a) => [[a]]
+fullHouses = removeDuplicatesString [[elem1, elem2, elem3, elem4, elem5]| elem1 <- baralho, elem2 <- baralho, elem3 <- baralho, elem4 <- baralho, elem5 <- baralho, fst (half elem1) == fst (half elem2), fst (half elem2) == fst (half elem3), fst (half elem4) == fst (half elem5), fst (half elem1) /= fst (half elem4)]
+
 
 valueHandAux [card1, card2] = [ card1Value+card2Value | [card1Value, card2Value] <- [ [card1Values, card2Values] | card1Values <- cardValue(card1), card2Values <- cardValue(card2)]]
 
@@ -97,12 +119,6 @@ gerapares cartas = [ [x,y] | (x:xs) <- [xs | xs <- tails cartas], y <- xs]
 34
 -}
 
-
-
-
-
-
-
 {- gera combinacoes de fullhouse a partir de um par e um trio -}
 gerafulls:: [[String]] -> [[String]] -> [[String]]
 gerafulls trio par = [ x ++ y| x <- trio, y <- par ]
@@ -110,7 +126,4 @@ gerafulls trio par = [ x ++ y| x <- trio, y <- par ]
 fullHouses:: [[String]]
 fullHouses = undefined{- [[trio, par]| trio <- trios, par <- pares] -}
 
-fullHouses2:: [[String]]
-fullHouses2 = [[elem1, elem2, elem3, elem4, elem5]| elem1 <- baralho, elem2 <- baralho, elem3 <- baralho, elem4 <- baralho, elem5 <- baralho, fst (half elem1) == fst (half elem2), fst (half elem2) == fst (half elem3), fst (half elem4) == fst (half elem5), fst (half elem1) /= fst (half elem4)]
-
- -}
+-}
