@@ -37,15 +37,12 @@ removeDuplicatesTuple xs = [(a, b) | i <- [0..length sortedPairs - 1], let (a, b
     where sortedPairs = [(min a b, max a b) | (a, b) <- xs]
 
 
--- Full Houses
-fullHouses = removeFirstThreeDuplicates ([ (card1, card2, card3, card4, card5) | card1 <- baralho, card2 <- baralho, card3 <- baralho, card4 <- baralho, card5 <- baralho, head card1 == head card2 && head card1 == head card3 && head card1 /= head card4 && head card4 == head card5 && tail card1 /= tail card2 && tail card1 /= tail card3 && tail card2 /= tail card3 && tail card4 /= tail card5 ])
+-- Full Houses, demora 1 min e 30 segundos | 2 minutos a correr
+fullHouses :: [[String]]
+fullHouses = removeFirstThreeDuplicates [ [card1, card2, card3, card4, card5] | card1 <- baralho, card2 <- baralho, card3 <- baralho, card4 <- baralho, card5 <- baralho, head card1 == head card2 && head card1 == head card3 && head card1 /= head card4 && head card4 == head card5 && tail card1 /= tail card2 && tail card1 /= tail card3 && tail card2 /= tail card3 && tail card4 /= tail card5 ]
 
+removeFirstThreeDuplicates :: [[String]] -> [[String]]
 removeFirstThreeDuplicates xs = [[a, b, c, d, e] | i <- [0..length sortedQuintuple - 1],
-                               let (a, b, c, d, e) = sortedQuintuple !! i,
-                               not ((a, b, c, d, e) `elem` (take i sortedQuintuple))]
-    where sortedQuintuple = [(minimum [a, b, c], minimum [x | x <- [a, b, c], x /= minimum [a, b, c]], maximum [a, b, c], min d e, max d e) | (a, b, c, d, e) <- xs]
-
-{- main = do
-  let full = fullHouses
-  print (take 10 full)
-  print (length full) -}
+                               let [a, b, c, d, e] = sortedQuintuple !! i,
+                               not ([a, b, c, d, e] `elem` (take i sortedQuintuple))]
+    where sortedQuintuple = [[minimum [a, b, c], minimum [x | x <- [a, b, c], x /= minimum [a, b, c]], maximum [a, b, c], min d e, max d e] | [a, b, c, d, e] <- xs]
