@@ -37,34 +37,68 @@ halve xs
 {- (b) Utilize a expressão let-in -}
 halve' :: [a] -> ([a],[a])
 halve' xs =
-	let half = length xs `div` 2
-	in (take half xs, drop half xs)
+    let half = length xs `div` 2
+    in (take half xs, drop half xs)
 
 {-
 Ficha 3, ex11. Escreva uma função que devolva o par de raízes de um polinómio do
 segundo grau, assumindo que o polinómio tem raízes reais. Dado um polinómio da
 forma ax^2 + bx + c, a função recebe três parâmetros a, b e c. Utilize o idioma where. -}
-raizes = undefined
+raizes :: Float -> Float -> Float -> (Float, Float)
+raizes a b c = (x1, x2)
+    where
+        delta = b^2 - 4*a*c
+        x1 = (-b + sqrt delta) / (2*a)
+        x2 = (-b - sqrt delta) / (2*a)
 
 {-
 Ficha 4, ex1. Defina as seguintes funções recursivamente:
 (a) função que devolve a soma dos elementos de uma lista. -}
-sum' = undefined
+sum' :: Num a => [a] -> a
+sum' [] = 0
+sum' (x:xs) = x + sum' xs
+
 
 {- (b) função que devolve uma lista com n elementos idênticos.
    Se n for negativo, produz a lista vazia. -}
-replicate' = undefined
+replicate' :: Int -> a -> [a]
+replicate' n a = replicateAux' 0 n a
+
+replicateAux' :: Int -> Int -> a -> [a]
+replicateAux' size n a
+    | n <= 0 = []
+    | n == size = []
+    | otherwise = a : replicateAux' (size + 1) n a
 
 {- (c) função que devolve o maior elemento de uma lista não vazia. -}
-maximo = undefined
+maximo :: [Int] -> Int
+maximo xs = maximoAux xs (minBound :: Int)
+
+maximoAux:: [Int] -> Int -> Int
+maximoAux (x:xs) a
+    | xs == [] = if a > x then a else x
+    | otherwise = if a > x then maximoAux xs a else maximoAux xs x
+
 
 {- (d) função que decide se um dado elemento existe numa dada lista. -}
-elem' = undefined
+elem' :: (Eq a) => [a] -> a -> Bool
+elem' xs a
+    | xs == [] = False
+    | otherwise = elemAux' xs a
+
+elemAux' :: (Eq a) => [a] -> a -> Bool
+elemAux' (x:xs) a
+    | xs == [] = x == a
+    | otherwise = if x == a then True else elem' xs a
 
 {- (e) função que substitui o primeiro elemento pelo segundo elemento na lista argumento. Por exemplo:
 ghci> substitui 'a' 'o' "as balas"
 "os bolos"                          -}
-substitui  = undefined
+
+substitui :: Eq a => a -> a -> [a] -> [a]
+substitui _ _ [] = []
+substitui x y (z:xs)    | x == z = y : substitui x y xs
+                        | otherwise = z : substitui x y xs
 
 {- (f) função que substitui todos os elementos da lista argumento que sejam menores que
    o segundo argumento, pelo terceiro argumento. -}
@@ -122,4 +156,10 @@ repBinaria = undefined
 {- Ficha 4, ex3. Escreva uma função que decide se um dado número é um número odioso. Um número odioso é
 um número não negativo que tem um número ímpar de uns na sua expansão binária. Os primeiros números
 odiosos são 1, 2, 4, 7, 8, 11. -}
-odioso = undefined
+numeroUns :: Int -> Int
+numeroUns x
+	| x < 2 = x
+	|otherwise = numeroUns (x `div` 2) + x `mod` 2
+
+odioso:: Int -> Bool
+odioso x = odd(numeroUns x)
