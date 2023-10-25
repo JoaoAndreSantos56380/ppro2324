@@ -90,8 +90,15 @@ filter' p xs = foldr (\x acc -> if p x then x : acc else acc) [] xs
 {- 21. Escreva a função indexOf que recebe uma lista e um possível elemento dessa lista,
 e devolve o primeiro índice onde esse elemento se encontra, ou -1 caso esse elemento
 não se encontre na lista. -}
-indexOf :: (Eq a) => [a] -> a -> Int
-indexOf xs elem = undefined{- foldl (\index x -> if x == elem && index > 0 then index else index + 1) (-1) xs -}
+-- feito pelo chat gpt
+indexOf :: Eq a => [a] -> a -> Int
+indexOf xs x = let result = fst (foldl findIndex (0, False) xs)
+               in if result == length xs then -1 else result
+  where
+    findIndex (idx, found) element
+      | found = (idx, True)
+      | element == x = (idx, True)
+      | otherwise = (idx + 1, False)
 
 {- 22. Um polinómio pode ser representado por uma lista de coeficientes.
 Por exemplo, a lista [5,2,0,1,2] representa o polinómio
