@@ -1,0 +1,11 @@
+#include <stdio.h>
+int main () {
+    int n1, n2;
+    printf ("Ola mundo!\n");
+    printf ("Digite um numero inteiro:");
+    scanf ("%d", &n1);
+    printf ("Digite outro numero inteiro:");
+    scanf ("%d", &n2);
+    printf ("total = %d\n", n1 + n2);
+    return 0;
+}
