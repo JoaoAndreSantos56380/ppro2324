@@ -6,7 +6,8 @@
 where -}
 
 import BaralhosExemplo
-import Graphics.Win32 (scrollBarStyle)
+
+-- import Graphics.Win32 (scrollBarStyle)
 
 data Naipe = Copas | Ouros | Paus | Espadas deriving (Show, Eq)
 
@@ -54,26 +55,32 @@ data EstadoJogo = EstadoJogo
     deck :: Baralho, -- Remaining deck of cards
     playerHand :: Baralho, -- Player's current hand
     dealerHand :: Baralho, -- Dealer's current hand
-    housePlay :: Bool -- Signals the end of a round
+    end :: String
   }
   deriving (Eq)
 
 instance Show EstadoJogo where
-  show EstadoJogo {playerCredits, currentBet, playerHand, dealerHand, housePlay} =
+  show EstadoJogo {playerCredits, currentBet, playerHand, dealerHand, deck, end} =
     "Player credits: "
       ++ show playerCredits
       ++ "\nCurrent Bet: "
       ++ show currentBet
       ++ "\nPlayer Hand ("
       ++ show (handValue playerHand)
+      ++ " "
+      ++ show (convenientHandValue playerHand)
       ++ "): "
       ++ show playerHand
       ++ "\nDealer Hand ("
       ++ show (handValue dealerHand)
+      ++ " "
+      ++ show (convenientHandValue dealerHand)
       ++ "): "
       ++ show dealerHand
-      ++ "\nHouse Turn: "
-      ++ show housePlay
+      ++ "\nDeck size: "
+      ++ show (tamanho deck)
+      ++ "\n"
+      ++ show end
 
 cardValue :: Carta -> [Int]
 cardValue Carta {value}
@@ -92,21 +99,21 @@ cardValue Carta {value}
   | value == Rei = [10]
 
 handValue :: [Carta] -> [Int]
-handValue cards = [left, right]
-  where
-    left = sum (map (head . cardValue) cards)
-    right = sum (map (last . cardValue) cards)
+handValue cards = map sum . sequence $ map cardValue cards
+
+convenientHandValue :: [Carta] -> Int
+convenientHandValue cards = if length (filter (< 22) (handValue cards)) > 1 then maximum (filter (< 22) (handValue cards)) else head (handValue cards)
 
 -- The inicialization function
 inicializa :: Baralho -> EstadoJogo
-inicializa deck = EstadoJogo initPlayerCredits initCurrentBet initDeck initPlayerHand initDealerHand initHousePlay
+inicializa deck = EstadoJogo initPlayerCredits initCurrentBet initDeck initPlayerHand initDealerHand initEnd
   where
     initPlayerCredits = 100
     initCurrentBet = 5
     initDeck = drop 4 deck
     initPlayerHand = take 2 deck
     initDealerHand = take 2 (drop 2 deck)
-    initHousePlay = False
+    initEnd = ""
 
 creditos :: EstadoJogo -> Int
 creditos EstadoJogo {playerCredits} = playerCredits
@@ -115,7 +122,7 @@ baralho :: EstadoJogo -> Baralho
 baralho EstadoJogo {deck} = deck
 
 terminado :: EstadoJogo -> Bool
-terminado EstadoJogo {playerCredits, deck} = playerCredits <= 0 || length deck <= 20
+terminado EstadoJogo {playerCredits, deck} = playerCredits <= 0 || length deck < 20
 
 type Estrategia = EstadoJogo -> Bool
 
@@ -128,43 +135,56 @@ sempreHit _ = True
 blackjacktstrat :: Estrategia
 blackjacktstrat EstadoJogo {playerCredits} = playerCredits > 1
 
-simulaRonda :: Estrategia -> EstadoJogo -> EstadoJogo
-simulaRonda e EstadoJogo {playerCredits, currentBet, deck, playerHand, dealerHand, housePlay} = ejNext
+{-
+convenientValue
+  | maximum hand > 21 = minimum hand
+  | head hand == 21 || last hand == 21 = 21
+  | otherwise = maximum hand
+-}
+
+simulaRonda :: Estrategia -> EstadoJogo -> IO EstadoJogo
+simulaRonda e state@(EstadoJogo {playerCredits, currentBet, deck, playerHand, dealerHand}) = do
+  if convenientHandValue playerHand > 21
+    then return $ state {playerCredits = playerCredits - currentBet, playerHand = take 2 nextDeck, deck = drop 4 nextDeck, dealerHand = take 2 (drop 2 nextDeck), end = "#### (1) PERDEU POERQUE TEM MAIS DE 21 PONTOS ####"}
+    else
+      if convenientHandValue playerHand == 21
+        then houseTurn state {end = ""}
+        else
+          if e state
+            then return $ state {playerHand = nextCard : playerHand, deck = nextDeck, end = ""}
+            else houseTurn state {end = ""}
   where
-    ejNext =
-      if e EstadoJogo {playerCredits, currentBet, deck, playerHand, dealerHand, housePlay}
-        then EstadoJogo {playerCredits = playerCredits, currentBet = currentBet, playerHand = nextCard : playerHand, deck = nextDeck, dealerHand = dealerHand, housePlay = nextHousePlay}
-        else EstadoJogo {playerCredits = playerCredits, currentBet = currentBet, deck = nextDeck, playerHand = playerHand, dealerHand = dealerHand, housePlay = True}
     nextCard = head deck
     nextDeck = tail deck
-    nextHousePlay = maximum (handValue (nextCard : playerHand)) == 21
 
-simulaJogo :: Estrategia -> Baralho -> Int
+simulaJogo :: Estrategia -> Baralho -> IO Int
 simulaJogo e deck = simulaJogoAux e (inicializa deck)
 
-simulaJogoAux :: Estrategia -> EstadoJogo -> Int
-simulaJogoAux e state = if terminado state then houseTurn state else simulaJogoAux e nextState
-  where
-    score = (\EstadoJogo {playerCredits} -> playerCredits) state
-    nextState = simulaRonda e state
+simulaJogoAux :: Estrategia -> EstadoJogo -> IO Int
+simulaJogoAux e state@EstadoJogo {playerCredits} = do
+  putStrLn (show state ++ "\n")
+  if terminado state
+    then return playerCredits
+    else do
+      newState <- simulaRonda e state
+      simulaJogoAux e newState
 
-houseTurn :: EstadoJogo -> Int
-houseTurn EstadoJogo {playerCredits, currentBet, deck, playerHand, dealerHand, housePlay} =
-  if dealerScore >= 17
+houseTurn :: EstadoJogo -> IO EstadoJogo
+houseTurn state@(EstadoJogo {playerCredits, currentBet, deck, playerHand, dealerHand}) = do
+  putStrLn (show state ++ "\n")
+  if convenientHandValue dealerHand >= 17
     then
-      ( if dealerScore > 21 || playerScore > dealerScore
-          then playerCredits + currentBet * 2
+      return $
+        if convenientHandValue playerHand > convenientHandValue dealerHand
+          then state {playerCredits = playerCredits + currentBet * 2, deck = drop 4 deck, playerHand = take 2 deck, dealerHand = take 2 (drop 2 deck), end = "#### (2) GANHOU PORQUE TEM MAIS PONTOS QUE O DEALER ####"}
           else
-            if playerScore == dealerScore
-              then playerCredits
-              else playerCredits - currentBet
-      )
-    else houseTurn EstadoJogo {playerCredits = playerCredits, currentBet = currentBet, deck = nextDeck, playerHand = playerHand, dealerHand = nextCard : dealerHand, housePlay = housePlay}
-  where
-    nextCard = head deck
-    nextDeck = tail deck
-    dealerScore = max (head (handValue dealerHand)) (last (handValue dealerHand))
-    playerScore = max (head (handValue playerHand)) (last (handValue playerHand))
+            if convenientHandValue playerHand == convenientHandValue dealerHand
+              then state {playerCredits = playerCredits, deck = drop 4 deck, playerHand = take 2 deck, dealerHand = take 2 (drop 2 deck), end = "#### EMPATOU ####"}
+              else
+                if convenientHandValue dealerHand > 21
+                  then state {playerCredits = playerCredits + currentBet * 2, deck = drop 4 deck, playerHand = take 2 deck, dealerHand = take 2 (drop 2 deck), end = "#### (3) GANHOU PORQUE O DEALER TEM MAIS DE 21 PONTOS ####"}
+                  else state {playerCredits = playerCredits - currentBet, deck = drop 4 deck, playerHand = take 2 deck, dealerHand = take 2 (drop 2 deck), end = "#### (4) PERDEU PORQUE O DEALER TEM MAIS PONTOS ####"}
+    else houseTurn state {deck = tail deck, dealerHand = head deck : dealerHand}
 
 -- dealerScore = min (head (handValue dealerHand)) (last (handValue dealerHand))
 -- playerScore = min (head (handValue playerHand)) (last (handValue playerHand))
@@ -179,25 +199,39 @@ houseTurn EstadoJogo {playerCredits, currentBet, deck, playerHand, dealerHand, h
 
 main :: IO ()
 main = do
-  let ejOrdenado = inicializa (converte baralhoOrdenado)
-  -- print (houseTurn game)
-  -- print (simulaJogoAux sempreStand game)
-  print (simulaJogo sempreStand (converte baralhoOrdenado))
-  print (tamanho (baralho ejOrdenado))
-  let nextState0 = simulaRonda sempreHit ejOrdenado
-  putStrLn (show ejOrdenado ++ "\n")
-  putStrLn (show nextState0 ++ "\n")
+  -- Uncomment any of the following lines to run simulations with different strategies and decks.
 
--- let nextState1 = simulaRonda sempreStand nextState0
--- putStrLn (show nextState1 ++ "\n")
-{- let nextState2 = simulaRonda sempreStand nextState1
-putStrLn (show nextState2 ++ "\n")
-let nextState3 = simulaRonda sempreStand nextState2
-putStrLn (show nextState3 ++ "\n")
-let nextState4 = simulaRonda sempreStand nextState3
-putStrLn (show nextState4 ++ "\n") -}
+  -- Simulate the game with a "stand" strategy and a simple deck.
+  finalCredits <- simulaJogo sempreStand (converte baralhoSimples)
+  putStrLn $ "Final credits after playing with sempreStand strategy: " ++ show finalCredits
 
--- let ej1 = simulaRonda sempreStand ejOrdenado
--- print (tamanho (baralho ej1))
+  -- Additional examples (commented out). Uncomment as needed.
+  -- finalCredits2 <- simulaJogo sempreHit (converte baralhoOrdenado)
+  -- putStrLn $ "Final credits after playing with sempreHit strategy: " ++ show finalCredits2
 
--- print (simulaJogo sempreHit (converte baralhoOrdenado))
+  -- finalCredits3 <- simulaJogo sempreStand (converte baralhoInsuficiente)
+  -- putStrLn $ "Final credits after playing with sempreStand strategy and insufficient deck: " ++ show finalCredits3
+
+  -- finalCredits4 <- simulaJogo sempreHit (converte baralhoInsuficiente)
+  -- putStrLn $ "Final credits after playing with sempreHit strategy and insufficient deck: " ++ show finalCredits4
+
+  putStrLn "Cool beans, man!"
+
+
+{-
+Jogo começa com a distribuição de 2 cartas para o jogador e 2 cartas para o dealer. ✅
+Se o valor mais conveniente da mão do jogador > 21, então jogador perde ✅
+Se o valor mais conveniente da mão do jogador == 21, então inicia "house play" ✅
+Se o valor mais conveniente da mão do jogador < 21, então jogador decide stand ou hit ✅
+  Se hit, então decide outra vez ✅
+  Se stand, então iniciamos "house play" ✅
+House Play ✅
+  Se convenientHandValue dealerHand < 17, então distribuir carta para o dealer ✅
+  Se convenientHandValue dealerHand >= 17, então calcula pontos ✅
+    Se convenientHandValue playerHand > convenientHandValue dealerHand, então jogador ganha ✅
+    Se convenientHandValue playerHand == convenientHandValue dealerHand, então empatam ✅
+    Se convenientHandValue playerHand < convenientHandValue dealerHand, então ✅
+      Se convenientHandValue dealerHand > 21, então jogador ganha ✅
+      Se convenientHandValue dealerHand <= 21, então jogador perde ✅
+
+-}
