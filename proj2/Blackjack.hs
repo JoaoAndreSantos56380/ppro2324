@@ -116,7 +116,7 @@ baralho :: EstadoJogo -> Baralho
 baralho EstadoJogo {deck} = deck
 
 terminado :: EstadoJogo -> Bool
-terminado EstadoJogo {playerCredits, deck} = playerCredits <= 0 || length deck < 20
+terminado EstadoJogo {playerCredits, currentBet, deck} = currentBet == 0 && (playerCredits <= 0 || length deck < 20)
 
 type Estrategia = EstadoJogo -> Bool
 
@@ -136,51 +136,39 @@ convenientValue
   | otherwise = maximum hand
 -}
 
-simulaRonda :: Estrategia -> EstadoJogo -> IO EstadoJogo
-simulaRonda e state@(EstadoJogo {playerCredits, currentBet, deck, playerHand, dealerHand}) = do
-  if currentBet == 0
-    then return $ state {status = "#### (0) Nova ronda! ####", playerCredits = playerCredits - 5, currentBet = 5, deck = drop 4 deck, playerHand = take 2 deck, dealerHand = take 2 (drop 2 deck)}
-    else
-      if convenientHandValue playerHand > 21
-        then return $ state {status = "#### (1) PERDEU POERQUE TEM MAIS DE 21 PONTOS ####", currentBet = 0, playerHand = [], dealerHand = []}
-        else
-          if convenientHandValue playerHand == 21
-            then houseTurn state {status = "### HOUSE TURN BECAUSE PLAYER HAS 21 POINTS ###"}
-            else
-              if e state
-                then return $ state {status = "### HIT ###", playerHand = nextCard : playerHand, deck = nextDeck}
-                else houseTurn state {status = "### HOUSE TURN BECAUSE PLAYER STOOD ###"}
+simulaRonda :: Estrategia -> EstadoJogo -> EstadoJogo
+simulaRonda e state@(EstadoJogo {playerCredits, currentBet, deck, playerHand, dealerHand})
+  | currentBet == 0 = state {status = "#### (0) Nova ronda! ####", playerCredits = playerCredits - 5, currentBet = 5, deck = drop 4 deck, playerHand = take 2 deck, dealerHand = take 2 (drop 2 deck)}
+  | convenientHandValue playerHand > 21 = state {status = "#### (1) PERDEU POERQUE TEM MAIS DE 21 PONTOS ####", currentBet = 0, playerHand = [], dealerHand = []}
+  | convenientHandValue playerHand == 21 = houseTurn state {status = "### HOUSE TURN BECAUSE PLAYER HAS 21 POINTS ###"}
+  | e state = state {status = "### HIT ###", playerHand = nextCard : playerHand, deck = nextDeck}
+  | otherwise = houseTurn state {status = "### HOUSE TURN BECAUSE PLAYER STOOD ###"}
   where
     nextCard = head deck
     nextDeck = tail deck
 
-simulaJogo :: Estrategia -> Baralho -> IO Int
+simulaJogo :: Estrategia -> Baralho -> Int
 simulaJogo e deck = simulaJogoAux e (inicializa deck)
 
-simulaJogoAux :: Estrategia -> EstadoJogo -> IO Int
-simulaJogoAux e state@EstadoJogo {playerCredits, currentBet} = do
-  putStrLn (show state ++ "\n")
+simulaJogoAux :: Estrategia -> EstadoJogo -> Int
+simulaJogoAux e state@EstadoJogo {playerCredits, currentBet} =
   if terminado state
-    then return (playerCredits + currentBet)
-    else do
-      newState <- simulaRonda e state
-      simulaJogoAux e newState
+    then playerCredits + currentBet
+    else simulaJogoAux e (simulaRonda e state)
 
-houseTurn :: EstadoJogo -> IO EstadoJogo
-houseTurn state@(EstadoJogo {playerCredits, currentBet, deck, playerHand, dealerHand}) = do
-  putStrLn (show state ++ "\n")
+houseTurn :: EstadoJogo -> EstadoJogo
+houseTurn state@(EstadoJogo {playerCredits, currentBet, deck, playerHand, dealerHand}) =
   if convenientHandValue dealerHand >= 17
     then
-      return $
-        if convenientHandValue playerHand > convenientHandValue dealerHand
-          then state {status = "#### (2) GANHOU PORQUE TEM MAIS PONTOS QUE O DEALER ####", playerCredits = playerCredits + currentBet * 2, currentBet = 0, playerHand = [], dealerHand = []}
-          else
-            if convenientHandValue playerHand == convenientHandValue dealerHand
-              then state {status = "#### EMPATOU ####", playerCredits = playerCredits + currentBet, currentBet = 0, playerHand = [], dealerHand = []}
-              else
-                if convenientHandValue dealerHand > 21
-                  then state {status = "#### (3) GANHOU PORQUE O DEALER TEM MAIS DE 21 PONTOS ####", playerCredits = playerCredits + currentBet * 2, currentBet = 0, playerHand = [], dealerHand = []}
-                  else state {status = "#### (4) PERDEU PORQUE O DEALER TEM MAIS PONTOS ####", currentBet = 0, playerHand = [], dealerHand = []}
+      if convenientHandValue playerHand > convenientHandValue dealerHand
+        then state {status = "#### (2) GANHOU PORQUE TEM MAIS PONTOS QUE O DEALER ####", playerCredits = playerCredits + currentBet * 2, currentBet = 0, playerHand = [], dealerHand = []}
+        else
+          if convenientHandValue playerHand == convenientHandValue dealerHand
+            then state {status = "#### EMPATOU ####", playerCredits = playerCredits + currentBet, currentBet = 0, playerHand = [], dealerHand = []}
+            else
+              if convenientHandValue dealerHand > 21
+                then state {status = "#### (3) GANHOU PORQUE O DEALER TEM MAIS DE 21 PONTOS ####", playerCredits = playerCredits + currentBet * 2, currentBet = 0, playerHand = [], dealerHand = []}
+                else state {status = "#### (4) PERDEU PORQUE O DEALER TEM MAIS PONTOS ####", currentBet = 0, playerHand = [], dealerHand = []}
     else houseTurn state {status = "### DISTRIBUTE CARDS TO DEALER BECAUSE DEALER HAS <17 POINTS ###", deck = tail deck, dealerHand = head deck : dealerHand}
 
 -- dealerScore = min (head (handValue dealerHand)) (last (handValue dealerHand))
@@ -199,47 +187,41 @@ main = do
   -- Uncomment any of the following lines to run simulations with different strategies and decks.
 
   -- Simulate the game with a "stand" strategy and a simple deck.
-  finalCredits <- simulaJogo sempreStand (converte baralhoOrdenado)
-  putStrLn $ "Final credits after playing with sempreStand strategy: " ++ show finalCredits
+  let finalCredits = simulaJogo sempreStand (converte baralhoOrdenado)
+  putStrLn $ "Final credits after playing with sempreStand strategy: 20 | " ++ show finalCredits
 
-  finalCredits <- simulaJogo sempreHit (converte baralhoOrdenado)
-  putStrLn $ "Final credits after playing with sempreHit strategy: " ++ show finalCredits
+  let finalCredits = simulaJogo sempreHit (converte baralhoOrdenado)
+  putStrLn $ "Final credits after playing with sempreHit strategy: 0 | " ++ show finalCredits
 
-  finalCredits <- simulaJogo sempreStand (converte baralhoInsuficiente)
-  putStrLn $ "Final credits after playing with sempreStand strategy: " ++ show finalCredits
+  let finalCredits = simulaJogo sempreStand (converte baralhoInsuficiente)
+  putStrLn $ "Final credits after playing with sempreStand strategy: 100 |  " ++ show finalCredits
 
-  finalCredits <- simulaJogo sempreHit (converte baralhoInsuficiente)
-  putStrLn $ "Final credits after playing with sempreHit strategy: " ++ show finalCredits
+  let finalCredits = simulaJogo sempreHit (converte baralhoInsuficiente)
+  putStrLn $ "Final credits after playing with sempreHit strategy: 100 |  " ++ show finalCredits
 
-  finalCredits <- simulaJogo sempreStand (converte baralhoSimples)
-  putStrLn $ "Final credits after playing with sempreStand strategy: " ++ show finalCredits
+  let finalCredits = simulaJogo sempreStand (converte baralhoSimples)
+  putStrLn $ "Final credits after playing with sempreStand strategy: 105 |  " ++ show finalCredits
 
-  finalCredits <- simulaJogo sempreHit (converte baralhoSimples)
-  putStrLn $ "Final credits after playing with sempreHit strategy: " ++ show finalCredits
+  let finalCredits = simulaJogo sempreHit (converte baralhoSimples)
+  putStrLn $ "Final credits after playing with sempreHit strategy: 95 | " ++ show finalCredits
 
-  finalCredits <- simulaJogo sempreStand (converte baralhoEmpate)
-  putStrLn $ "Final credits after playing with sempreStand strategy: " ++ show finalCredits
+  let finalCredits = simulaJogo sempreStand (converte baralhoEmpate)
+  putStrLn $ "Final credits after playing with sempreStand strategy: 100 |  " ++ show finalCredits
 
-  finalCredits <- simulaJogo sempreHit (converte baralhoEmpate)
-  putStrLn $ "Final credits after playing with sempreHit strategy: " ++ show finalCredits
+  let finalCredits = simulaJogo sempreHit (converte baralhoEmpate)
+  putStrLn $ "Final credits after playing with sempreHit strategy: 100 |  " ++ show finalCredits
 
-  finalCredits <- simulaJogo sempreStand (converte baralhoPerdido)
-  putStrLn $ "Final credits after playing with sempreStand strategy: " ++ show finalCredits
+  let finalCredits = simulaJogo sempreStand (converte baralhoPerdido)
+  putStrLn $ "Final credits after playing with sempreStand strategy: 95 | " ++ show finalCredits
 
-  finalCredits <- simulaJogo sempreHit (converte baralhoPerdido)
-  putStrLn $ "Final credits after playing with sempreHit strategy: " ++ show finalCredits
+  let finalCredits = simulaJogo sempreHit (converte baralhoPerdido)
+  putStrLn $ "Final credits after playing with sempreHit strategy: 90 | " ++ show finalCredits
 
-  finalCredits <- simulaJogo sempreStand (converte baralhoGanho)
-  putStrLn $ "Final credits after playing with sempreStand strategy: " ++ show finalCredits
+  let finalCredits = simulaJogo sempreStand (converte baralhoGanho)
+  putStrLn $ "Final credits after playing with sempreStand strategy: 110 |  " ++ show finalCredits
 
-  finalCredits <- simulaJogo sempreHit (converte baralhoGanho)
-  putStrLn $ "Final credits after playing with sempreStand strategy: " ++ show finalCredits
-
-
-
-
-
-
+  let finalCredits = simulaJogo sempreHit (converte baralhoGanho)
+  putStrLn $ "Final credits after playing with sempreStand strategy: 105 |  " ++ show finalCredits
 
   -- Additional examples (commented out). Uncomment as needed.
   -- finalCredits2 <- simulaJogo sempreHit (converte baralhoOrdenado)
