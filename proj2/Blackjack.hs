@@ -1,4 +1,6 @@
 -- fc56326,fc56380
+-- com o modulo main funciona tudo bem. mas com o ghci da erro (var not in scope)
+-- por vezes o ghci funciona e outras vezes nao
 module Blackjack (converte, tamanho, inicializa, creditos, baralho, terminado, sempreStand, sempreHit, simulaRonda, simulaJogo, handValue, convenientHandValue, blackjacktstrat) where
 
 import BaralhosExemplo
