@@ -1,7 +1,7 @@
 module BaralhosExemplo where
 
 baralhoOrdenado :: [String] -- sempreStand 20, sempreHit 0
-baralhoOrdenado = [ [valor,naipe] | naipe <- "SHDC", valor <- "A23456789TJQK", _ <- [1..6] ]
+baralhoOrdenado = [[valor, naipe] | naipe <- "SHDC", valor <- "A23456789TJQK", _ <- [1 .. 6]]
 
 baralhoInsuficiente :: [String] -- sempreStand 100, sempreHit 100
 baralhoInsuficiente = replicate 20 "QC"
