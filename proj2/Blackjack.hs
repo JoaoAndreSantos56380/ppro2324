@@ -116,7 +116,7 @@ baralho :: EstadoJogo -> Baralho
 baralho EstadoJogo {deck} = deck
 
 terminado :: EstadoJogo -> Bool
-terminado EstadoJogo {playerCredits, currentBet, deck} = currentBet == 0 && (playerCredits <= 0 || length deck < 20)
+terminado EstadoJogo {playerCredits, currentBet, deck} = currentBet == 0 && (playerCredits <= 0 || length deck <= 20)
 
 type Estrategia = EstadoJogo -> Bool
 
@@ -232,8 +232,6 @@ main = do
 
   -- finalCredits4 <- simulaJogo sempreHit (converte baralhoInsuficiente)
   -- putStrLn $ "Final credits after playing with sempreHit strategy and insufficient deck: " ++ show finalCredits4
-
-  putStrLn "Cool beans, man!"
 
 {-
 Jogo começa com a distribuição de 2 cartas para o jogador e 2 cartas para o dealer. ✅
