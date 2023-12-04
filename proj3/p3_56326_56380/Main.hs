@@ -24,9 +24,61 @@ import System.Environment (getArgs) -- mandar mail sobre isto!!!!!!!!!!!!!!!!!!!
 import System.IO
 import System.Random (newStdGen)
 import System.Random.Shuffle (shuffle')
+import System.Exit (exitSuccess)
+
+
+exitIfQuit :: String -> IO ()
+exitIfQuit "sair" = exitSuccess -- error "Program terminated by user."
+exitIfQuit _ = return ()
+
+playGameWithFile :: String -> IO ()
+playGameWithFile file = do
+    cardsArray <- ler file
+    result <- jogaBlackjack (inicializa (converte cardsArray))
+    putStrLn $ "final Credits: " ++ show result
 
 
 main :: IO ()
+main = do
+  args <- getArgs
+  case args of
+    ["-t"] -> putStrLn "Option -t selected."
+    ["-n", n] -> do
+      exitIfQuit n
+      cardsArray <- generateDeck (read n::Int)
+      result <- jogaBlackjack (inicializa (converte cardsArray))
+      putStrLn $ "final Credits: " ++ show result
+    [arg] -> do
+      exitIfQuit arg
+      playGameWithFile arg
+    [] -> do
+      cardsArray <- ler "default.bar"
+      result <- jogaBlackjack (inicializa (converte cardsArray))
+      putStrLn $ "final Credits: " ++ show result
+    _ -> putStrLn "usage: ./Main <input_file>"
+
+
+
+{- main :: IO ()
+main = do
+  args <- getArgs
+  case args of
+    ["-t"] -> putStrLn "Option -t selected."
+    ["-n", n] -> do
+      exitIfQuit n
+      cardsArray <- generateDeck (read n::Int)
+      result <- jogaBlackjack (inicializa (converte cardsArray))
+      putStrLn $ "final Credits: " ++ show result
+    [arg] -> do
+      exitIfQuit arg
+      putStrLn $ arg ++ " selected."
+    [] -> do
+      cardsArray <- ler "default.bar"
+      result <- jogaBlackjack (inicializa (converte cardsArray))
+      putStrLn $ "final Credits: " ++ show result
+    _ -> putStrLn "usage: ./Main <input_file>" -}
+
+{- main :: IO ()
 main = do
   args <- getArgs
   case args of
@@ -40,7 +92,7 @@ main = do
       cardsArray <- ler "default.bar"
       result <- jogaBlackjack (inicializa (converte cardsArray))
       putStrLn $ "final Credits: " ++ show result
-    _ -> putStrLn "usage: ./Main <input_file>"
+    _ -> putStrLn "usage: ./Main <input_file>" -}
 
 ler :: String -> IO [String]
 ler file = do
@@ -88,12 +140,48 @@ jogaBlackjack state@EstadoJogo{playerCredits, currentBet}
 
 -- ler aposta da consola e criar estado novo
 askBet :: EstadoJogo -> IO EstadoJogo
+askBet state@EstadoJogo {playerCredits, deck} = do
+  print state
+  putStr "Enter your bet (format 'apostar n'): "
+  hFlush stdout
+  input <- getLine
+  let inputWords = words input
+  if head inputWords == "sair"
+    then exitSuccess
+    else
+      if length inputWords == 2 && head inputWords == "apostar"
+        then
+          let bet = read (inputWords !! 1) :: Int
+              newState =
+                state
+                  { playerCredits = playerCredits - bet,
+                    currentBet = bet,
+                    deck = drop 4 deck,
+                    playerHand = take 2 deck,
+                    dealerHand = take 2 (drop 2 deck)
+                  }
+           in return newState
+        else do
+          putStrLn "Invalid input format. Please enter in 'apostar n' format."
+          askBet state
+
+{- askBet :: EstadoJogo -> IO EstadoJogo
 askBet state@EstadoJogo {playerCredits, currentBet, deck} = do
   print state
   putStr "Enter your bet: "
   hFlush stdout
   bet <- getLine
-  return state {playerCredits = playerCredits - read bet :: Int, currentBet = read bet :: Int, deck = drop 4 deck, playerHand = take 2 deck, dealerHand = take 2 (drop 2 deck)}
+  if bet == "sair"
+    then exitSuccess --error "Program terminated by user."
+    else return state {playerCredits = playerCredits - read bet :: Int, currentBet = read bet :: Int, deck = drop 4 deck, playerHand = take 2 deck, dealerHand = take 2 (drop 2 deck)} -}
+
+{- askBet :: EstadoJogo -> IO EstadoJogo
+askBet state@EstadoJogo {playerCredits, currentBet, deck} = do
+  print state
+  putStr "Enter your bet: "
+  hFlush stdout
+  bet <- getLine
+  return state {playerCredits = playerCredits - read bet :: Int, currentBet = read bet :: Int, deck = drop 4 deck, playerHand = take 2 deck, dealerHand = take 2 (drop 2 deck)} -}
 
 {- askBet :: EstadoJogo -> EstadoJogo
 askBet state@EstadoJogo{playerCredits, currentBet} = state -}
