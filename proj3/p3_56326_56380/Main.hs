@@ -20,12 +20,16 @@ através de um dos seguintes quatro tipos de instruções:
 -}
 
 import Blackjack
-import System.Environment (getArgs) -- mandar mail sobre isto!!!!!!!!!!!!!!!!!!!!
-import System.IO
-import System.Random (newStdGen)
-import System.Random.Shuffle (shuffle')
-import System.Exit (exitSuccess)
+-- mandar mail sobre isto!!!!!!!!!!!!!!!!!!!!
 
+import Data.List
+import System.Environment (getArgs)
+import System.Exit (exitSuccess)
+import System.IO
+import System.Random (mkStdGen, newStdGen)
+import System.Random.Shuffle (shuffle, shuffle')
+
+-- import Test.QuickCheck
 
 exitIfQuit :: String -> IO ()
 exitIfQuit "sair" = exitSuccess -- error "Program terminated by user."
@@ -33,10 +37,9 @@ exitIfQuit _ = return ()
 
 playGameWithFile :: String -> IO ()
 playGameWithFile file = do
-    cardsArray <- ler file
-    result <- jogaBlackjack (inicializa (converte cardsArray))
-    putStrLn $ "final Credits: " ++ show result
-
+  cardsArray <- ler file
+  result <- jogaBlackjack (inicializa (converte cardsArray))
+  putStrLn $ "final Credits: " ++ show result
 
 main :: IO ()
 main = do
@@ -45,7 +48,7 @@ main = do
     ["-t"] -> putStrLn "Option -t selected."
     ["-n", n] -> do
       exitIfQuit n
-      cardsArray <- generateDeck (read n::Int)
+      cardsArray <- generateDeck (read n :: Int)
       result <- jogaBlackjack (inicializa (converte cardsArray))
       putStrLn $ "final Credits: " ++ show result
     [arg] -> do
@@ -57,43 +60,6 @@ main = do
       putStrLn $ "final Credits: " ++ show result
     _ -> putStrLn "usage: ./Main <input_file>"
 
-
-
-{- main :: IO ()
-main = do
-  args <- getArgs
-  case args of
-    ["-t"] -> putStrLn "Option -t selected."
-    ["-n", n] -> do
-      exitIfQuit n
-      cardsArray <- generateDeck (read n::Int)
-      result <- jogaBlackjack (inicializa (converte cardsArray))
-      putStrLn $ "final Credits: " ++ show result
-    [arg] -> do
-      exitIfQuit arg
-      putStrLn $ arg ++ " selected."
-    [] -> do
-      cardsArray <- ler "default.bar"
-      result <- jogaBlackjack (inicializa (converte cardsArray))
-      putStrLn $ "final Credits: " ++ show result
-    _ -> putStrLn "usage: ./Main <input_file>" -}
-
-{- main :: IO ()
-main = do
-  args <- getArgs
-  case args of
-    ["-t"] -> putStrLn "Option -t selected."
-    ["-n", n] -> do
-      cardsArray <- generateDeck (read n::Int)
-      result <- jogaBlackjack (inicializa (converte cardsArray))
-      putStrLn $ "final Credits: " ++ show result
-    [arg] -> putStrLn $ arg ++ " selected."
-    [] -> do
-      cardsArray <- ler "default.bar"
-      result <- jogaBlackjack (inicializa (converte cardsArray))
-      putStrLn $ "final Credits: " ++ show result
-    _ -> putStrLn "usage: ./Main <input_file>" -}
-
 ler :: String -> IO [String]
 ler file = do
   contents <- readFile file
@@ -104,96 +70,108 @@ generateDeck n = do
   rng <- newStdGen
   let deck = [[valor, naipe] | naipe <- "SHDC", valor <- "A23456789TJQK", _ <- [1 .. n]]
   let shuffledDeck = shuffle' deck (length deck) rng
-  --print shuffledDeck
+  -- print shuffledDeck
   return shuffledDeck
 
-
--- ligar o meu chat gpt ao cursor!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 jogaBlackjack :: EstadoJogo -> IO Int
-jogaBlackjack state = do
-  if terminado state
-    then return (playerCredits state + currentBet state)
-    else do
-      newState@EstadoJogo {playerCredits, currentBet, playerHand, deck} <- if currentBet state == 0 then askBet state else return state
-      if convenientHandValue playerHand > 21
-        then do
-          print "Derrota"
-          jogaBlackjack newState {currentBet = 0, playerHand = [], dealerHand = []}
+jogaBlackjack game@EstadoJogo {playerHand, playerCredits, currentBet, state} = do
+    if terminado game then
+        if state == Won then do
+            print "Vitoria"
+            return (playerCredits + currentBet)
+        else if state == Tied then do
+            print "Empate"
+            return (playerCredits + currentBet)
+        else if state == Lost then do
+            print "Derrota"
+            return (playerCredits + currentBet)
         else
-          if convenientHandValue playerHand == 21
-            then do
-              houseTurnState <- houseTurn newState
-              jogaBlackjack houseTurnState
-            else do
-              hit <- askMove newState
-              if hit
-                then jogaBlackjack newState {playerHand = head deck : playerHand, deck = tail deck}
-                else do
-                  houseTurnState <- houseTurn newState
-                  jogaBlackjack houseTurnState
+            return (playerCredits + currentBet)
+    else if state == Initial then do
+        print game
+        if convenientHandValue playerHand == 21 then jogaBlackjack (houseTurn game{state = HouseTurn}) else jogaBlackjack game {state = AskBet}
+    else if state == AskBet then do
+        bet <- askBet
+        if bet == -1 then
+            return (playerCredits + currentBet)
+        else
+            jogaBlackjack (playRound game{state=AskBet} bet False)
+    else if state == AskHit then
+        if convenientHandValue playerHand < 21 then do
+            hit <- askHit game
+            jogaBlackjack (playRound game currentBet hit)
+        else
+            jogaBlackjack (playRound game currentBet False)
+    else if state == Verify then do
+        print game
+        jogaBlackjack (playRound game currentBet False)
+    else if state == Won then do
+        print "Vitoria"
+        jogaBlackjack game{state = Initial}
+    else if state == Tied then do
+        print "Empate"
+        jogaBlackjack game{state = Initial}
+    else do
+        print "Derrota"
+        jogaBlackjack game{state = Initial}
 
-{- jogaBlackjack :: EstadoJogo -> Int
-jogaBlackjack state@EstadoJogo{playerCredits, currentBet}
-  | currentBet == 0 = jogaBlackjack (askBet state)
-  | terminado state = playerCredits + currentBet
-  | otherwise = jogaBlackjack (simulateRound (askMove state) state) -}
-
--- ler aposta da consola e criar estado novo
-askBet :: EstadoJogo -> IO EstadoJogo
-askBet state@EstadoJogo {playerCredits, deck} = do
-  print state
+askBet :: IO Int
+askBet = do
   putStr "Enter your bet (format 'apostar n'): "
   hFlush stdout
   input <- getLine
   let inputWords = words input
   if head inputWords == "sair"
-    then exitSuccess
+    then return (-1)
     else
       if length inputWords == 2 && head inputWords == "apostar"
-        then
-          let bet = read (inputWords !! 1) :: Int
-              newState =
-                state
-                  { playerCredits = playerCredits - bet,
-                    currentBet = bet,
-                    deck = drop 4 deck,
-                    playerHand = take 2 deck,
-                    dealerHand = take 2 (drop 2 deck)
-                  }
-           in return newState
+        then return (read (inputWords !! 1) :: Int)
         else do
           putStrLn "Invalid input format. Please enter in 'apostar n' format."
-          askBet state
+          askBet
 
-{- askBet :: EstadoJogo -> IO EstadoJogo
-askBet state@EstadoJogo {playerCredits, currentBet, deck} = do
-  print state
-  putStr "Enter your bet: "
-  hFlush stdout
-  bet <- getLine
-  if bet == "sair"
-    then exitSuccess --error "Program terminated by user."
-    else return state {playerCredits = playerCredits - read bet :: Int, currentBet = read bet :: Int, deck = drop 4 deck, playerHand = take 2 deck, dealerHand = take 2 (drop 2 deck)} -}
-
-{- askBet :: EstadoJogo -> IO EstadoJogo
-askBet state@EstadoJogo {playerCredits, currentBet, deck} = do
-  print state
-  putStr "Enter your bet: "
-  hFlush stdout
-  bet <- getLine
-  return state {playerCredits = playerCredits - read bet :: Int, currentBet = read bet :: Int, deck = drop 4 deck, playerHand = take 2 deck, dealerHand = take 2 (drop 2 deck)} -}
-
-{- askBet :: EstadoJogo -> EstadoJogo
-askBet state@EstadoJogo{playerCredits, currentBet} = state -}
-
--- imprimir estado e pedir move ao user na consola
-askMove :: EstadoJogo -> IO Bool
-askMove state@EstadoJogo {playerCredits, currentBet} = do
-  print state
+askHit :: EstadoJogo -> IO Bool
+askHit game@EstadoJogo {playerCredits, currentBet} = do
+  print game
   putStr "Enter your move (Hit or Stand): "
   hFlush stdout
   move <- getLine
   return (move == "Hit")
 
-{- askMove :: EstadoJogo -> Bool
-askMove state@EstadoJogo{playerCredits, currentBet} = False -}
+{- prop_initialHandValue :: [Carta] -> Bool
+prop_initialHandValue hand = length hand == 2 && convenientHandValue hand <= 21 -}
+
+{- prop_playerCreditsAfterRound :: Int -> Bool -> Bool
+prop_playerCreditsAfterRound bet hit =
+  let state = EstadoJogo {playerCredits = 100 - bet, currentBet = bet, deck = [], playerHand = [], dealerHand = []}
+      updatedState = playRound state bet hit
+      expectedCredits =
+        if convenientHandValue (playerHand updatedState) == 21
+          then 100 + bet
+          else
+            if convenientHandValue (dealerHand updatedState) == 21
+              then 100 - bet
+              else 100
+   in playerCredits updatedState == expectedCredits -}
+
+{- prop_dealerHandValue :: [Carta] -> Bool
+prop_dealerHandValue dealerHand =
+  let finalValue = undefined -- Função que simula a jogada da casa e retorna o valor da mão
+   in finalValue >= 17 -}
+
+{- prop_deckIntegrity :: Baralho -> Bool
+prop_deckIntegrity deck = length deck == 52 && length (nub deck) == length deck -}
+
+{- prop_shuffleDeckIntegrity :: Baralho -> Bool
+prop_shuffleDeckIntegrity deck =
+  let shuffledDeck = shuffle deck
+  in sort shuffledDeck == sort deck -}
+
+{- prop_shuffleDeckIntegrity :: Baralho -> Bool
+prop_shuffleDeckIntegrity deck =
+  let seed = 52 -- or any other fixed number for reproducibility
+      shuffledDeck = shuffle' deck (length deck) (mkStdGen seed)
+   in sort shuffledDeck == sort deck -}
+
+{- prop_betValue :: Int -> Int -> Bool
+prop_betValue credits bet = bet >= 0 && bet <= credits -}

@@ -1,6 +1,6 @@
 -- fc56326,fc56380~
 -- se compilar o blackjack na "mesma" pasta do ghci, o import nao e feito corretamente
-module Blackjack (houseTurn, Estrategia, EstadoJogo(..), converte, tamanho, inicializa, creditos, Baralho, baralho, terminado, sempreStand, sempreHit{- , simulaRonda -}{- , simulaJogo -}, handValue, convenientHandValue, blackjacktstrat) where
+module Blackjack (applyBet, GameState(..),Carta(..),Naipe(..), Valor(..), houseTurn, Estrategia, EstadoJogo (..), converte, tamanho, inicializa, creditos, Baralho, baralho, playRound, terminado, sempreStand, sempreHit, handValue, convenientHandValue, blackjacktstrat) where
 
 data Naipe = Copas | Ouros | Paus | Espadas deriving (Show, Eq)
 
@@ -40,12 +40,15 @@ converte = map stringToCard
 tamanho :: Baralho -> Int
 tamanho = length
 
+data GameState = Initial | AskBet | AskHit | Verify | HouseTurn | Won | Lost | Tied | Terminated deriving (Eq, Enum)
+
 data EstadoJogo = EstadoJogo
   { playerCredits :: Int, -- Current player credits
     currentBet :: Int, -- Current bet amount
     deck :: Baralho, -- Remaining deck of cards
     playerHand :: Baralho, -- Player's current hand
-    dealerHand :: Baralho -- Dealer's current hand
+    dealerHand :: Baralho, -- Dealer's current hand
+    state :: GameState -- What happened on the last state (useful to print messages)
   }
   deriving (Eq)
 
@@ -69,6 +72,8 @@ instance Show EstadoJogo where
       ++ show dealerHand
       ++ "\nDeck size: "
       ++ show (tamanho deck)
+      ++ " "
+      ++ show (head deck)
 
 cardValue :: Carta -> [Int]
 cardValue Carta {value}
@@ -93,7 +98,7 @@ convenientHandValue :: [Carta] -> Int
 convenientHandValue cards = if length (filter (< 22) (handValue cards)) > 1 then maximum (filter (< 22) (handValue cards)) else head (handValue cards)
 
 inicializa :: Baralho -> EstadoJogo
-inicializa deck = EstadoJogo 100 0 deck [] []
+inicializa deck = EstadoJogo 100 0 deck [] [] Initial
 
 creditos :: EstadoJogo -> Int
 creditos EstadoJogo {playerCredits} = playerCredits
@@ -115,42 +120,42 @@ sempreHit _ _ _ _ = (5, True)
 blackjacktstrat :: Estrategia
 blackjacktstrat playerCredits _ _ _ = (5, playerCredits > 1)
 
-{- simulaRonda :: Estrategia -> EstadoJogo -> EstadoJogo
-simulaRonda e state@(EstadoJogo {playerCredits, currentBet, deck, playerHand, dealerHand})
-  | currentBet == 0 = state {playerCredits = playerCredits - 5, currentBet = 5, deck = drop 4 deck, playerHand = take 2 deck, dealerHand = take 2 (drop 2 deck)}
-  | convenientHandValue playerHand > 21 = state {currentBet = 0, playerHand = [], dealerHand = []}
-  | convenientHandValue playerHand == 21 = houseTurn state
-  | snd (e playerCredits currentBet playerHand dealerHand) = state {playerHand = nextCard : playerHand, deck = nextDeck}
-  | otherwise = houseTurn state
-  where
-    nextCard = head deck
-    nextDeck = tail deck -}
+houseTurn :: EstadoJogo -> EstadoJogo
+houseTurn state@(EstadoJogo {playerCredits, currentBet, deck, playerHand, dealerHand}) =
+  if convenientHandValue dealerHand >= 17
+    then
+      if convenientHandValue playerHand > convenientHandValue dealerHand
+        then state {playerCredits = playerCredits + currentBet * 2, currentBet = 0, playerHand = [], dealerHand = [], state = Won}
+        else
+          if convenientHandValue playerHand == convenientHandValue dealerHand
+            then state {playerCredits = playerCredits + currentBet, currentBet = 0, playerHand = [], dealerHand = [], state = Tied}
+            else
+              if convenientHandValue dealerHand > 21
+                then state {playerCredits = playerCredits + currentBet * 2, currentBet = 0, playerHand = [], dealerHand = [], state = Won}
+                else state {currentBet = 0, playerHand = [], dealerHand = [], state = Lost}
+    else state {deck = tail deck, dealerHand = head deck : dealerHand, state = HouseTurn}
 
-{- simulaJogo :: Estrategia -> Baralho -> Int
-simulaJogo e deck = simulaJogoAux e (inicializa deck) -}
+playRound :: EstadoJogo -> Int -> Bool -> EstadoJogo
+playRound game@EstadoJogo {playerHand, deck, state} bet hit
+  | state == AskBet = applyBet game bet
+  | convenientHandValue playerHand > 21 = game {currentBet = 0, playerHand = [], dealerHand = [], state = Lost}
+  | convenientHandValue playerHand == 21 = playRound (houseTurn game {state = HouseTurn}) bet hit
+  | hit = game {playerHand = head deck : playerHand, deck = tail deck, state = Verify}
+  | state == Verify = game {state = AskHit}
+  | state == Lost = game
+  | state == Won = game
+  | state == Tied = game
+  | otherwise = playRound (houseTurn game{state = HouseTurn}) bet hit
 
-{- simulaJogoAux :: Estrategia -> EstadoJogo -> Int
-simulaJogoAux e state@EstadoJogo {playerCredits, currentBet} =
-  if terminado state
-    then playerCredits + currentBet
-    else simulaJogoAux e (simulaRonda e state) -}
-
-houseTurn :: EstadoJogo -> IO EstadoJogo
-houseTurn state@(EstadoJogo {playerCredits, currentBet, deck, playerHand, dealerHand}) = 
-  if convenientHandValue dealerHand >= 17 then
-      if convenientHandValue playerHand > convenientHandValue dealerHand then do
-        print "Vitoria"
-        return state {playerCredits = playerCredits + currentBet * 2, currentBet = 0, playerHand = [], dealerHand = []}
-      else if convenientHandValue playerHand == convenientHandValue dealerHand then do
-          print "Empate"
-          return state {playerCredits = playerCredits + currentBet, currentBet = 0, playerHand = [], dealerHand = []}
-      else if convenientHandValue dealerHand > 21 then do
-        print "Vitoria"
-        return state {playerCredits = playerCredits + currentBet * 2, currentBet = 0, playerHand = [], dealerHand = []}
-      else do
-        print "Derrota"
-        return state {currentBet = 0, playerHand = [], dealerHand = []}
-  else do
-    let newState = state {deck = tail deck, dealerHand = head deck : dealerHand}
-    print newState
-    houseTurn newState
+applyBet :: EstadoJogo -> Int -> EstadoJogo
+applyBet game@EstadoJogo {playerCredits, deck} bet =
+  let newGame =
+        game
+          { playerCredits = playerCredits - bet,
+            currentBet = bet,
+            deck = drop 4 deck,
+            playerHand = take 2 deck,
+            dealerHand = take 2 (drop 2 deck),
+            state = AskHit
+          }
+   in newGame
