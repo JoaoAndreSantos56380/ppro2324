@@ -26,59 +26,53 @@ instance Arbitrary EstadoJogo where
 {- prop_initialHandValue :: [Carta] -> Property
 prop_initialHandValue hand = length hand == 2 ==> convenientHandValue hand <= 21 -}
 
+-- P1
 prop_initialHandValue :: Carta -> Carta -> Bool
-prop_initialHandValue left right = convenientHandValue [left,right] <= 21
+prop_initialHandValue left right = convenientHandValue [left, right] <= 21
 
-
-
-{- prop_playerCreditsAfterRound :: EstadoJogo -> Int -> Bool -> Bool
-prop_playerCreditsAfterRound game bet hit =
-    (bet <= 0) || (do
-        let gamePlayerCredits = playerCredits game
-        let updatedGame = game {currentBet = bet}
-        let updatedState = playRound updatedGame bet hit
-        let updatedPlayerCredits = playerCredits updatedState
-        updatedPlayerCredits + bet == gamePlayerCredits || updatedPlayerCredits == gamePlayerCredits - bet || updatedPlayerCredits == gamePlayerCredits) -}
-
--- The property to test
+-- P2
 prop_CreditsAfterRound :: Int -> Int -> Bool -> EstadoJogo -> Property
 prop_CreditsAfterRound n a standOrHit gameState =
   n > 0
     && a > 0
     && a
       <= n
-        ==> let initialGameState -- Ensure valid starting credits and bet
-                  = applyBet gameState a  -- Assuming a function to set initial credits
+        ==> let initialGameState =
+                  applyBet gameState a
                 newState = playRound initialGameState a standOrHit
-                finalCredits = playerCredits newState -- Assuming a function to get current credits
+                finalCredits = playerCredits newState
              in finalCredits == playerCredits newState - a || finalCredits == playerCredits newState || finalCredits == playerCredits newState + a
 
--- The property to test
-{- prop_CreditsAfterRound :: Int -> Int -> Bool -> EstadoJogo -> Bool
-prop_CreditsAfterRound n a standOrHit gameState =
-  let initialCredits = n
-      bet = a
-      newState = playRound gameState bet standOrHit -- Play a round with the bet 'a' and choice of stand or hit
-      finalCredits = creditos newState -- Get the credits after the round
-   in finalCredits == n - a || finalCredits == n || finalCredits == n + a -}
+prop_gameAfterRound :: Int -> Bool -> EstadoJogo -> Property
+prop_gameAfterRound bet hit game =
+  bet > 0
+    && bet
+      <= playerCredits game
+        ==> let finalGameState = playRound (applyBet game bet) bet hit
+                finalPlayerHand = playerHand finalGameState
+                finalDealerHand = dealerHand finalGameState
+                finalDeck = deck finalGameState
+             in null finalPlayerHand && null finalDealerHand && length finalDeck < length (deck game)
 
+{-
+game{state = Initial} X X => playerCredits = +aposta | -aposta | =, playerHand = [], dealerHand = [], length deck < length deck inicial
+-}
 
-{- prop_playerCreditsAfterRound2 :: EstadoJogo -> Int -> Bool -> Bool
-prop_playerCreditsAfterRound2 game bet hit = do
-  bet > 0 && convenientHandValue (playerHand game) /= 21 ==> do
-        let gamePlayerCredits = playerCredits game
-        let updatedGame = game {currentBet = bet}
-        let updatedState = playRound updatedGame bet hit
-        let updatedPlayerCredits = playerCredits updatedState
-        updatedPlayerCredits == gamePlayerCredits + bet || updatedPlayerCredits == gamePlayerCredits - bet || updatedPlayerCredits == gamePlayerCredits -}
+-- P3
+prop_houseTurnValue :: EstadoJogo -> Bool
+prop_houseTurnValue game = convenientHandValue (dealerHand (houseTurn game)) >= 17
 
-{- prop_dealerHandValue :: [Carta] -> Bool
-prop_dealerHandValue dealerHand =
-  let finalValue = undefined -- Função que simula a jogada da casa e retorna o valor da mão
-   in finalValue >= 17 -}
+-- P4 (Depois de uma aposta, temos 2 cartas no player)
+prop_deckIntegrity :: Baralho -> Property
+prop_deckIntegrity deck = length deck == 52 ==> length (nub deck) == length deck
 
-{- prop_deckIntegrity :: Baralho -> Property
-prop_deckIntegrity deck = length deck == 52 ==> length (nub deck) == length deck -}
+-- P5 (Depois de uma aposta, temos 2 cartas no dealer)
+
+-- P6 (Depois de um hit, o player tem mais um carta)
+
+-- P7 (Ao iniciar uma ronda, o player tem as 2 primeiras cartas e o dealer tem as 2 segundos cartas)
+
+-- P8 (No final de uma ronda, as mãos de player e dealer+baralho atual = baralho original)
 
 {- prop_shuffleDeckIntegrity :: Baralho -> Bool
 prop_shuffleDeckIntegrity deck =
@@ -91,6 +85,5 @@ prop_shuffleDeckIntegrity deck =
       shuffledDeck = shuffle' deck (length deck) (mkStdGen seed)
    in sort shuffledDeck == sort deck -}
 
-{- prop_betValue :: Int -> Int -> Bool
-prop_betValue credits bet = bet >= 0 && bet <= credits -}
-
+prop_betValue :: Int -> Int -> Bool
+prop_betValue credits bet = bet >= 0 && bet <= credits

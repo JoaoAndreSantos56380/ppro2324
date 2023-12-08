@@ -75,45 +75,61 @@ generateDeck n = do
 
 jogaBlackjack :: EstadoJogo -> IO Int
 jogaBlackjack game@EstadoJogo {playerHand, playerCredits, currentBet, state} = do
-    if terminado game then
-        if state == Won then do
-            print "Vitoria"
-            return (playerCredits + currentBet)
-        else if state == Tied then do
-            print "Empate"
-            return (playerCredits + currentBet)
-        else if state == Lost then do
-            print "Derrota"
-            return (playerCredits + currentBet)
+  if terminado game
+    then
+      if state == Won
+        then do
+          print "Vitoria"
+          return (playerCredits + currentBet)
         else
-            return (playerCredits + currentBet)
-    else if state == Initial then do
-        print game
-        if convenientHandValue playerHand == 21 then jogaBlackjack (houseTurn game{state = HouseTurn}) else jogaBlackjack game {state = AskBet}
-    else if state == AskBet then do
-        bet <- askBet
-        if bet == -1 then
-            return (playerCredits + currentBet)
+          if state == Tied
+            then do
+              print "Empate"
+              return (playerCredits + currentBet)
+            else
+              if state == Lost
+                then do
+                  print "Derrota"
+                  return (playerCredits + currentBet)
+                else return (playerCredits + currentBet)
+    else
+      if state == Initial
+        then do
+          print game
+          if convenientHandValue playerHand == 21 then jogaBlackjack (houseTurn game {state = HouseTurn}) else jogaBlackjack game {state = AskBet}
         else
-            jogaBlackjack (playRound game{state=AskBet} bet False)
-    else if state == AskHit then
-        if convenientHandValue playerHand < 21 then do
-            hit <- askHit game
-            jogaBlackjack (playRound game currentBet hit)
-        else
-            jogaBlackjack (playRound game currentBet False)
-    else if state == Verify then do
-        print game
-        jogaBlackjack (playRound game currentBet False)
-    else if state == Won then do
-        print "Vitoria"
-        jogaBlackjack game{state = Initial}
-    else if state == Tied then do
-        print "Empate"
-        jogaBlackjack game{state = Initial}
-    else do
-        print "Derrota"
-        jogaBlackjack game{state = Initial}
+          if state == AskBet
+            then do
+              bet <- askBet
+              if bet == -1
+                then return (playerCredits + currentBet)
+                else jogaBlackjack (playRound game {state = AskBet} bet False)
+            else
+              if state == AskHit
+                then
+                  if convenientHandValue playerHand < 21
+                    then do
+                      hit <- askHit game
+                      jogaBlackjack (playRound game currentBet hit)
+                    else jogaBlackjack (playRound game currentBet False)
+                else
+                  if state == AfterHit
+                    then do
+                      print game
+                      jogaBlackjack (playRound game currentBet False)
+                    else
+                      if state == Won
+                        then do
+                          print "Vitoria"
+                          jogaBlackjack game {state = Initial}
+                        else
+                          if state == Tied
+                            then do
+                              print "Empate"
+                              jogaBlackjack game {state = Initial}
+                            else do
+                              print "Derrota"
+                              jogaBlackjack game {state = Initial}
 
 askBet :: IO Int
 askBet = do
@@ -136,7 +152,7 @@ askHit game@EstadoJogo {playerCredits, currentBet} = do
   putStr "Enter your move (Hit or Stand): "
   hFlush stdout
   move <- getLine
-  return (move == "Hit")
+  return (move == "hit")
 
 {- prop_initialHandValue :: [Carta] -> Bool
 prop_initialHandValue hand = length hand == 2 && convenientHandValue hand <= 21 -}

@@ -1,6 +1,6 @@
 -- fc56326,fc56380~
 -- se compilar o blackjack na "mesma" pasta do ghci, o import nao e feito corretamente
-module Blackjack (applyBet, GameState(..),Carta(..),Naipe(..), Valor(..), houseTurn, Estrategia, EstadoJogo (..), converte, tamanho, inicializa, creditos, Baralho, baralho, playRound, terminado, sempreStand, sempreHit, handValue, convenientHandValue, blackjacktstrat) where
+module Blackjack (applyBet, GameState (..), Carta (..), Naipe (..), Valor (..), houseTurn, Estrategia, EstadoJogo (..), converte, tamanho, inicializa, creditos, Baralho, baralho, playRound, terminado, sempreStand, sempreHit, handValue, convenientHandValue, blackjacktstrat) where
 
 data Naipe = Copas | Ouros | Paus | Espadas deriving (Show, Eq)
 
@@ -40,7 +40,7 @@ converte = map stringToCard
 tamanho :: Baralho -> Int
 tamanho = length
 
-data GameState = Initial | AskBet | AskHit | Verify | HouseTurn | Won | Lost | Tied | Terminated deriving (Eq, Enum)
+data GameState = Initial | AskBet | AskHit | AfterHit | HouseTurn | Won | Lost | Tied | Terminated deriving (Eq, Enum)
 
 data EstadoJogo = EstadoJogo
   { playerCredits :: Int, -- Current player credits
@@ -121,31 +121,26 @@ blackjacktstrat :: Estrategia
 blackjacktstrat playerCredits _ _ _ = (5, playerCredits > 1)
 
 houseTurn :: EstadoJogo -> EstadoJogo
-houseTurn state@(EstadoJogo {playerCredits, currentBet, deck, playerHand, dealerHand}) =
-  if convenientHandValue dealerHand >= 17
-    then
-      if convenientHandValue playerHand > convenientHandValue dealerHand
-        then state {playerCredits = playerCredits + currentBet * 2, currentBet = 0, playerHand = [], dealerHand = [], state = Won}
-        else
-          if convenientHandValue playerHand == convenientHandValue dealerHand
-            then state {playerCredits = playerCredits + currentBet, currentBet = 0, playerHand = [], dealerHand = [], state = Tied}
-            else
-              if convenientHandValue dealerHand > 21
-                then state {playerCredits = playerCredits + currentBet * 2, currentBet = 0, playerHand = [], dealerHand = [], state = Won}
-                else state {currentBet = 0, playerHand = [], dealerHand = [], state = Lost}
-    else state {deck = tail deck, dealerHand = head deck : dealerHand, state = HouseTurn}
+houseTurn game@(EstadoJogo {deck, dealerHand}) =
+  if convenientHandValue dealerHand < 17
+    then houseTurn game {deck = tail deck, dealerHand = head deck : dealerHand}
+    else game
 
 playRound :: EstadoJogo -> Int -> Bool -> EstadoJogo
-playRound game@EstadoJogo {playerHand, deck, state} bet hit
+playRound game@EstadoJogo {playerHand, currentBet, playerCredits, dealerHand, deck, state} bet hit
   | state == AskBet = applyBet game bet
+  | state == HouseTurn && convenientHandValue playerHand > convenientHandValue dealerHand = game {playerCredits = playerCredits + currentBet * 2, currentBet = 0, playerHand = [], dealerHand = [], state = Won}
+  | state == HouseTurn && convenientHandValue playerHand == convenientHandValue dealerHand = game {playerCredits = playerCredits + currentBet, currentBet = 0, playerHand = [], dealerHand = [], state = Tied}
+  | state == HouseTurn && convenientHandValue dealerHand > 21 = game {playerCredits = playerCredits + currentBet * 2, currentBet = 0, playerHand = [], dealerHand = [], state = Won}
+  | state == HouseTurn = game {currentBet = 0, playerHand = [], dealerHand = [], state = Lost}
   | convenientHandValue playerHand > 21 = game {currentBet = 0, playerHand = [], dealerHand = [], state = Lost}
-  | convenientHandValue playerHand == 21 = playRound (houseTurn game {state = HouseTurn}) bet hit
-  | hit = game {playerHand = head deck : playerHand, deck = tail deck, state = Verify}
-  | state == Verify = game {state = AskHit}
+  | convenientHandValue playerHand == 21 = playRound (houseTurn game{state = HouseTurn}) bet hit
+  | hit = game {playerHand = head deck : playerHand, deck = tail deck, state = AfterHit}
+  | state == AfterHit = game {state = AskHit}
   | state == Lost = game
   | state == Won = game
   | state == Tied = game
-  | otherwise = playRound (houseTurn game{state = HouseTurn}) bet hit
+  | otherwise = playRound (houseTurn game {state = HouseTurn}) bet hit
 
 applyBet :: EstadoJogo -> Int -> EstadoJogo
 applyBet game@EstadoJogo {playerCredits, deck} bet =
