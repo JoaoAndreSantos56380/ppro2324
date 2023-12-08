@@ -128,18 +128,12 @@ houseTurn game@(EstadoJogo {deck, dealerHand}) =
 
 playRound :: EstadoJogo -> Int -> Bool -> EstadoJogo
 playRound game@EstadoJogo {playerHand, currentBet, playerCredits, dealerHand, deck, state} bet hit
-  | state == AskBet = applyBet game bet
   | state == HouseTurn && convenientHandValue playerHand > convenientHandValue dealerHand = game {playerCredits = playerCredits + currentBet * 2, currentBet = 0, playerHand = [], dealerHand = [], state = Won}
   | state == HouseTurn && convenientHandValue playerHand == convenientHandValue dealerHand = game {playerCredits = playerCredits + currentBet, currentBet = 0, playerHand = [], dealerHand = [], state = Tied}
   | state == HouseTurn && convenientHandValue dealerHand > 21 = game {playerCredits = playerCredits + currentBet * 2, currentBet = 0, playerHand = [], dealerHand = [], state = Won}
   | state == HouseTurn = game {currentBet = 0, playerHand = [], dealerHand = [], state = Lost}
   | convenientHandValue playerHand > 21 = game {currentBet = 0, playerHand = [], dealerHand = [], state = Lost}
   | convenientHandValue playerHand == 21 = playRound (houseTurn game{state = HouseTurn}) bet hit
-  | hit = game {playerHand = head deck : playerHand, deck = tail deck, state = AfterHit}
-  | state == AfterHit = game {state = AskHit}
-  | state == Lost = game
-  | state == Won = game
-  | state == Tied = game
   | otherwise = playRound (houseTurn game {state = HouseTurn}) bet hit
 
 applyBet :: EstadoJogo -> Int -> EstadoJogo

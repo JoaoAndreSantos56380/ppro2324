@@ -103,33 +103,44 @@ jogaBlackjack game@EstadoJogo {playerHand, playerCredits, currentBet, state} = d
               bet <- askBet
               if bet == -1
                 then return (playerCredits + currentBet)
-                else jogaBlackjack (playRound game {state = AskBet} bet False)
+                else do
+                  let newGameState =
+                        game
+                          { playerCredits = playerCredits - bet,
+                            currentBet = bet,
+                            deck = drop 4 (deck game),
+                            playerHand = take 2 (deck game),
+                            dealerHand = take 2 (drop 2 (deck game)),
+                            state = AskHit
+                          }
+                  print newGameState
+                  jogaBlackjack newGameState
             else
               if state == AskHit
                 then
                   if convenientHandValue playerHand < 21
                     then do
                       hit <- askHit game
-                      jogaBlackjack (playRound game currentBet hit)
+                      if hit
+                        then do
+                          let newGameState = game {playerHand = head (deck game) : playerHand, deck = tail (deck game)}
+                          print newGameState
+                          jogaBlackjack newGameState
+                        else jogaBlackjack (playRound game currentBet False)
                     else jogaBlackjack (playRound game currentBet False)
                 else
-                  if state == AfterHit
+                  if state == Won
                     then do
-                      print game
-                      jogaBlackjack (playRound game currentBet False)
+                      print "Vitoria"
+                      jogaBlackjack game {state = Initial}
                     else
-                      if state == Won
+                      if state == Tied
                         then do
-                          print "Vitoria"
+                          print "Empate"
                           jogaBlackjack game {state = Initial}
-                        else
-                          if state == Tied
-                            then do
-                              print "Empate"
-                              jogaBlackjack game {state = Initial}
-                            else do
-                              print "Derrota"
-                              jogaBlackjack game {state = Initial}
+                        else do
+                          print "Derrota"
+                          jogaBlackjack game {state = Initial}
 
 askBet :: IO Int
 askBet = do
@@ -148,8 +159,7 @@ askBet = do
 
 askHit :: EstadoJogo -> IO Bool
 askHit game@EstadoJogo {playerCredits, currentBet} = do
-  print game
-  putStr "Enter your move (Hit or Stand): "
+  putStr "Enter your move (hit or stand): "
   hFlush stdout
   move <- getLine
   return (move == "hit")
