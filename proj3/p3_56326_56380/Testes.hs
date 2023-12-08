@@ -23,8 +23,13 @@ instance Arbitrary EstadoJogo where
     return $ EstadoJogo {playerCredits = playerCredits, currentBet = 0, deck = deck, playerHand = playerHand, dealerHand = dealerHand, state = Initial}
 
 -- Em dúvida
-prop_initialHandValue :: [Carta] -> Property
-prop_initialHandValue hand = length hand == 2 ==> convenientHandValue hand <= 21
+{- prop_initialHandValue :: [Carta] -> Property
+prop_initialHandValue hand = length hand == 2 ==> convenientHandValue hand <= 21 -}
+
+prop_initialHandValue :: Carta -> Carta -> Bool
+prop_initialHandValue left right = convenientHandValue [left,right] <= 21
+
+
 
 {- prop_playerCreditsAfterRound :: EstadoJogo -> Int -> Bool -> Bool
 prop_playerCreditsAfterRound game bet hit =
