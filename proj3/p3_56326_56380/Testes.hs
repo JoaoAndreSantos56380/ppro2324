@@ -1,3 +1,5 @@
+module Testes (prop_initialHandValue, prop_CreditsAfterRound, prop_gameAfterRound, prop_houseTurnValue, prop_initialPlayerHandSize, prop_initialDealerHandSize, prop_playerHandSizeAfterHit, prop_cardDistribution, prop_endRound, Carta, EstadoJogo) where
+
 import Blackjack
 import Data.List
 import Test.QuickCheck
@@ -43,6 +45,15 @@ prop_CreditsAfterRound n a standOrHit gameState =
                 finalCredits = playerCredits newState
              in finalCredits == playerCredits newState - a || finalCredits == playerCredits newState || finalCredits == playerCredits newState + a
 
+-- P3
+prop_houseTurnValue :: EstadoJogo -> Bool
+prop_houseTurnValue game = convenientHandValue (dealerHand (houseTurn game)) >= 17
+
+{-
+game{state = Initial} X X => playerCredits = +aposta | -aposta | =, playerHand = [], dealerHand = [], length deck < length deck inicial
+-}
+
+-- P4
 prop_gameAfterRound :: Int -> Bool -> EstadoJogo -> Property
 prop_gameAfterRound bet hit game =
   bet > 0
@@ -54,36 +65,30 @@ prop_gameAfterRound bet hit game =
                 finalDeck = deck finalGameState
              in null finalPlayerHand && null finalDealerHand && length finalDeck < length (deck game)
 
-{-
-game{state = Initial} X X => playerCredits = +aposta | -aposta | =, playerHand = [], dealerHand = [], length deck < length deck inicial
--}
+-- P5 (Depois de uma aposta, temos 2 cartas no player)
+prop_initialPlayerHandSize :: EstadoJogo -> Int -> Bool
+prop_initialPlayerHandSize game bet = length (playerHand (applyBet game bet)) == 2
 
--- P3
-prop_houseTurnValue :: EstadoJogo -> Bool
-prop_houseTurnValue game = convenientHandValue (dealerHand (houseTurn game)) >= 17
+-- P6 (Depois de uma aposta, temos 2 cartas no dealer)
+prop_initialDealerHandSize :: EstadoJogo -> Int -> Bool
+prop_initialDealerHandSize game bet = length (dealerHand (applyBet game bet)) == 2
 
--- P4 (Depois de uma aposta, temos 2 cartas no player)
-prop_deckIntegrity :: Baralho -> Property
-prop_deckIntegrity deck = length deck == 52 ==> length (nub deck) == length deck
+-- P7 (Depois de um hit, o player tem mais um carta)
+prop_playerHandSizeAfterHit :: EstadoJogo -> Bool
+prop_playerHandSizeAfterHit game =
+  let initialPlayerHand = playerHand game
+   in length initialPlayerHand + 1 == length (playerHand (applyHit game))
 
--- P5 (Depois de uma aposta, temos 2 cartas no dealer)
+-- P8 (Ao iniciar uma ronda, o player tem as 2 primeiras cartas e o dealer tem as 2 segundos cartas)
+prop_cardDistribution :: EstadoJogo -> Bool
+prop_cardDistribution game@EstadoJogo {deck} = playerHand gameAfterBet == take 2 deck && dealerHand gameAfterBet == take 2 (drop 2 deck)
+  where
+    gameAfterBet = applyBet game 1
 
--- P6 (Depois de um hit, o player tem mais um carta)
-
--- P7 (Ao iniciar uma ronda, o player tem as 2 primeiras cartas e o dealer tem as 2 segundos cartas)
-
--- P8 (No final de uma ronda, as mãos de player e dealer+baralho atual = baralho original)
-
-{- prop_shuffleDeckIntegrity :: Baralho -> Bool
-prop_shuffleDeckIntegrity deck =
-  let shuffledDeck = shuffle deck
-  in sort shuffledDeck == sort deck -}
-
-{- prop_shuffleDeckIntegrity :: Baralho -> Bool
-prop_shuffleDeckIntegrity deck =
-  let seed = 52 -- or any other fixed number for reproducibility
-      shuffledDeck = shuffle' deck (length deck) (mkStdGen seed)
-   in sort shuffledDeck == sort deck -}
-
-prop_betValue :: Int -> Int -> Bool
-prop_betValue credits bet = bet >= 0 && bet <= credits
+-- P9 (No final de uma ronda, bet == 0, playerHand == [], dealerHand == [], deck < deck original)
+prop_endRound :: EstadoJogo -> Bool
+prop_endRound game = currentBet nextGame == 0 && null (playerHand nextGame) && null (dealerHand nextGame) && length nextDeck <= length initialDeck
+  where
+    initialDeck = deck game
+    nextGame = playRound (applyBet game 1) 1 False
+    nextDeck = deck nextGame
