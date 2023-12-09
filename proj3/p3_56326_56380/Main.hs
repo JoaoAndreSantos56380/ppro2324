@@ -21,11 +21,14 @@ através de um dos seguintes quatro tipos de instruções:
 
 import Blackjack
 import Data.List
+-- Import your tests
+
+import Data.Time.Format.ISO8601 (hourFormat)
 import System.Environment (getArgs)
 import System.Exit (exitSuccess)
 import System.IO
 import System.Random (mkStdGen, newStdGen)
-import System.Random.Shuffle (shuffle, shuffle') -- Import your tests
+import System.Random.Shuffle (shuffle, shuffle')
 import Test.QuickCheck
 import Testes
 
@@ -120,12 +123,13 @@ jogaBlackjack game@EstadoJogo {playerHand, playerCredits, currentBet, state} = d
                 else do
                   let newGameState = applyBet game bet
                   printPlayerAndDealerDecks newGameState
-                  if convenientHandValue (getPlayerHand newGameState) == 21 then do
-                    let gameAfterHouseTurn = houseTurn newGameState {state = HouseTurn}
-                    printPlayerAndDealerDecks gameAfterHouseTurn
-                    jogaBlackjack gameAfterHouseTurn{state = AskHit}
-                  else do
-                    jogaBlackjack newGameState
+                  if convenientHandValue (getPlayerHand newGameState) == 21
+                    then do
+                      let gameAfterHouseTurn = houseTurn newGameState {state = HouseTurn}
+                      printPlayerAndDealerDecks gameAfterHouseTurn
+                      jogaBlackjack gameAfterHouseTurn {state = AskHit}
+                    else do
+                      jogaBlackjack newGameState
             else
               if state == AskHit
                 then
@@ -137,18 +141,24 @@ jogaBlackjack game@EstadoJogo {playerHand, playerCredits, currentBet, state} = d
                           let newGameState = applyHit game
                           -- print newGameState
                           printPlayerAndDealerDecks newGameState
-                          jogaBlackjack newGameState
+                          if convenientHandValue (getPlayerHand newGameState) == 21 then do
+                            let gameAfterHouseTurn = houseTurn newGameState
+                            printPlayerAndDealerDecks gameAfterHouseTurn
+                            let reset = resetGame (playRound gameAfterHouseTurn currentBet False)
+                            jogaBlackjack reset
+                          else jogaBlackjack newGameState
                         else do
                           let gameAfterPlayRound = playRound game currentBet False
                           printPlayerAndDealerDecks gameAfterPlayRound
                           let reset = resetGame gameAfterPlayRound
-                          jogaBlackjack reset --gameAfterPlayRound
+                          jogaBlackjack reset -- gameAfterPlayRound
                     else do
-                      let gameAfterPlayRound = playRound game currentBet False
+                      -- let gameAfterPlayRound = playRound game currentBet False
+                      let gameAfterHouseTurn = houseTurn game
+                      --printPlayerAndDealerDecks gameAfterHouseTurn
                       --printPlayerAndDealerDecks gameAfterPlayRound
-                      --printPlayerAndDealerDecks gameAfterPlayRound
-                      let reset = resetGame gameAfterPlayRound
-                      jogaBlackjack reset--gameAfterPlayRound
+                      let reset = resetGame (playRound gameAfterHouseTurn currentBet False)
+                      jogaBlackjack reset
                 else
                   if state == Won
                     then do
@@ -201,4 +211,3 @@ printPlayerAndDealerDecks :: EstadoJogo -> IO ()
 printPlayerAndDealerDecks game = do
   putStrLn $ "jogador: " ++ (unwords . desconverte $ playerHand game)
   putStrLn $ "casa: " ++ (unwords . desconverte $ dealerHand game)
-
