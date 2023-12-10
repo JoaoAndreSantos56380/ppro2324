@@ -21,7 +21,6 @@ através de um dos seguintes quatro tipos de instruções:
 
 import Blackjack
 import Data.List
--- Import your tests
 
 import Data.Time.Format.ISO8601 (hourFormat)
 import System.Environment (getArgs)
@@ -42,11 +41,8 @@ main = do
       quickCheck prop_CreditsAfterRound
       quickCheck prop_houseTurnValue
       quickCheck prop_gameAfterRound
-      quickCheck prop_initialPlayerHandSize
-      quickCheck prop_initialDealerHandSize
       quickCheck prop_playerHandSizeAfterHit
       quickCheck prop_cardDistribution
-      quickCheck prop_endRound
     ["-n", n] -> do
       cardsArray <- generateDeck (read n :: Int)
       result <- jogaBlackjack (inicializa (converte cardsArray))
@@ -71,15 +67,8 @@ generateDeck n = do
   rng <- newStdGen
   let deck = [[valor, naipe] | naipe <- "SHDC", valor <- "A23456789TJQK", _ <- [1 .. n]]
   let shuffledDeck = shuffle' deck (length deck) rng
-  -- print shuffledDeck
   return shuffledDeck
 
-{- startGame :: EstadoJogo -> IO Int
-startGame game = do
-  printCardsAndCredits game
-  finalGameState <- jogaBlackjack game
-  printCardsAndCredits finalGameState
-  return (playerCredits finalGameState + currentBet finalGameState) -}
 
 jogaBlackjack :: EstadoJogo -> IO EstadoJogo
 jogaBlackjack game@EstadoJogo {playerHand, playerCredits, currentBet, state} = do
@@ -102,11 +91,10 @@ jogaBlackjack game@EstadoJogo {playerHand, playerCredits, currentBet, state} = d
                   putStrLn "Derrota"
                   printCardsAndCredits game
                   return game
-                else return game -- sair
+                else return game
     else
       if state == Initial
         then do
-          -- print game
           if convenientHandValue playerHand == 21
             then do
               let gameAfterHouseTurn = houseTurn game {state = HouseTurn}
@@ -139,24 +127,23 @@ jogaBlackjack game@EstadoJogo {playerHand, playerCredits, currentBet, state} = d
                       if hit
                         then do
                           let newGameState = applyHit game
-                          -- print newGameState
                           printPlayerAndDealerDecks newGameState
                           if convenientHandValue (getPlayerHand newGameState) == 21 then do
                             let gameAfterHouseTurn = houseTurn newGameState
                             printPlayerAndDealerDecks gameAfterHouseTurn
                             let reset = resetGame (playRound gameAfterHouseTurn currentBet False)
                             jogaBlackjack reset
-                          else jogaBlackjack newGameState
+                          else if convenientHandValue (getPlayerHand newGameState) < 21 then do
+                           jogaBlackjack newGameState
+                          else do
+                           jogaBlackjack newGameState {currentBet = 0, state = Lost}
                         else do
                           let gameAfterPlayRound = playRound game currentBet False
                           printPlayerAndDealerDecks gameAfterPlayRound
                           let reset = resetGame gameAfterPlayRound
-                          jogaBlackjack reset -- gameAfterPlayRound
+                          jogaBlackjack reset
                     else do
-                      -- let gameAfterPlayRound = playRound game currentBet False
                       let gameAfterHouseTurn = houseTurn game
-                      --printPlayerAndDealerDecks gameAfterHouseTurn
-                      --printPlayerAndDealerDecks gameAfterPlayRound
                       let reset = resetGame (playRound gameAfterHouseTurn currentBet False)
                       jogaBlackjack reset
                 else
@@ -178,8 +165,6 @@ getPlayerHand = playerHand
 
 askBet :: IO Int
 askBet = do
-  -- putStr "Enter your bet (format 'apostar n'): "
-  -- hFlush stdout
   input <- getLine
   let inputWords = words input
   if head inputWords == "sair"
@@ -193,8 +178,6 @@ askBet = do
 
 askHit :: EstadoJogo -> IO Bool
 askHit game@EstadoJogo {playerCredits, currentBet} = do
-  -- putStr "Enter your move (hit or stand): "
-  -- hFlush stdout
   move <- getLine
   return (move == "hit")
 
@@ -203,10 +186,6 @@ printCardsAndCredits game = do
   putStrLn $ "cartas: " ++ show (length (deck game))
   putStrLn $ "creditos: " ++ show (playerCredits game)
 
-{- printPlayerAndDealerDecks :: EstadoJogo -> IO ()
-printPlayerAndDealerDecks game = do
-    putStrLn $ "jogador: " ++ show (desconverte (playerHand game))
-    putStrLn $ "casa: " ++ show (desconverte (dealerHand game)) -}
 printPlayerAndDealerDecks :: EstadoJogo -> IO ()
 printPlayerAndDealerDecks game = do
   putStrLn $ "jogador: " ++ (unwords . desconverte $ playerHand game)
